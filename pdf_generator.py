@@ -78,8 +78,7 @@ def create_pdf_report(
 
     add_page_number(
         temp_result,
-        output_pdf,
-        data
+        output_pdf
     )
 
     os.remove(temp_page)
@@ -88,45 +87,13 @@ def create_pdf_report(
 
 def add_page_number(
     input_pdf,
-    output_pdf,
-    data=None
+    output_pdf
 ):
 
     reader = PdfReader(input_pdf)
     writer = PdfWriter()
 
     total_pages = len(reader.pages)
-
-    # =========================
-    # BIKIN DAFTAR DARI DATA ASLI
-    # (bukan tulisan manual lagi)
-    # =========================
-
-    apps_list = []
-
-    if data:
-
-        total = sum(
-            value for _, value in data
-        )
-
-        for i, (nama, nilai) in enumerate(data):
-
-            if total > 0:
-                persen = round(
-                    (nilai / total) * 100,
-                    1
-                )
-            else:
-                persen = 0
-
-            apps_list.append(
-                (
-                    str(i + 1),
-                    nama,
-                    f"{persen}%"
-                )
-            )
 
     for index, page in enumerate(reader.pages):
 
@@ -142,65 +109,6 @@ def add_page_number(
                 height
             )
         )
-
-        # =========================
-        # DAFTAR 5 KIRI 5 KANAN
-        # HALAMAN TERAKHIR
-        # =========================
-
-        if index == total_pages - 1 and apps_list:
-
-            c.setFillColorRGB(
-                0,
-                0,
-                0
-            )
-
-            left_apps = apps_list[:5]
-            right_apps = apps_list[5:]
-
-            start_y = 210
-            line_height = 28
-
-            left_x = 70
-            right_x = width / 2 + 40
-
-            c.setFont(
-                "Helvetica",
-                13
-            )
-
-            for i, app in enumerate(left_apps):
-
-                y = start_y - (i * line_height)
-
-                c.drawString(
-                    left_x,
-                    y,
-                    f"{app[0]}. {app[1]}"
-                )
-
-                c.drawRightString(
-                    width / 2 - 20,
-                    y,
-                    app[2]
-                )
-
-            for i, app in enumerate(right_apps):
-
-                y = start_y - (i * line_height)
-
-                c.drawString(
-                    right_x,
-                    y,
-                    f"{app[0]}. {app[1]}"
-                )
-
-                c.drawRightString(
-                    width - 55,
-                    y,
-                    app[2]
-                )
 
         # =========================
         # FOOTER HITAM FULL LEBAR
