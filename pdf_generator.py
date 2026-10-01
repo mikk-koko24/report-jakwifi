@@ -1,5 +1,6 @@
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
+from PIL import Image
 from io import BytesIO
 import os
 
@@ -7,7 +8,8 @@ import os
 def create_pdf_report(
     original_pdf,
     chart_image,
-    output_pdf
+    output_pdf,
+    data=None
 ):
 
     temp_page = "temp_chart_page.pdf"
@@ -20,11 +22,6 @@ def create_pdf_report(
     page_width = float(first_page.mediabox.width)
     page_height = float(first_page.mediabox.height)
 
-    # =========================
-    # BUAT HALAMAN TERAKHIR
-    # BERISI GAMBAR PNG SAJA
-    # =========================
-
     c = canvas.Canvas(
         temp_page,
         pagesize=(
@@ -33,24 +30,34 @@ def create_pdf_report(
         )
     )
 
-    margin = 20
+    img = Image.open(chart_image)
+
+    img_width, img_height = img.size
+
+    margin = 40
+
+    ratio = min(
+        (page_width - margin * 2) / img_width,
+        (page_height - margin * 2) / img_height
+    )
+
+    new_width = img_width * ratio
+    new_height = img_height * ratio
+
+    x = (page_width - new_width) / 2
+    y = (page_height - new_height) / 2
+
+    y = y + 100
 
     c.drawImage(
         chart_image,
-        margin,
-        margin,
-        width=page_width - (margin * 2),
-        height=page_height - (margin * 2),
-        preserveAspectRatio=True,
-        anchor="c"
+        x,
+        y,
+        width=new_width,
+        height=new_height
     )
 
     c.save()
-
-    # =========================
-    # GABUNGKAN PDF ASLI
-    # + HALAMAN PNG
-    # =========================
 
     writer = PdfWriter()
 
@@ -69,30 +76,20 @@ def create_pdf_report(
     ) as f:
         writer.write(f)
 
-    # =========================
-    # TAMBAHKAN NOMOR HALAMAN
-    # KE PDF ASLI SAJA
-    # =========================
-
     add_page_number(
         temp_result,
-        output_pdf
+        output_pdf,
+        data
     )
 
-    # =========================
-    # HAPUS FILE SEMENTARA
-    # =========================
-
-    if os.path.exists(temp_page):
-        os.remove(temp_page)
-
-    if os.path.exists(temp_result):
-        os.remove(temp_result)
+    os.remove(temp_page)
+    os.remove(temp_result)
 
 
 def add_page_number(
     input_pdf,
-    output_pdf
+    output_pdf,
+    data=None
 ):
 
     reader = PdfReader(input_pdf)
@@ -100,24 +97,38 @@ def add_page_number(
 
     total_pages = len(reader.pages)
 
+    # =========================
+    # BIKIN DAFTAR DARI DATA ASLI
+    # (bukan tulisan manual lagi)
+    # =========================
+
+    apps_list = []
+
+    if data:
+
+        total = sum(
+            value for _, value in data
+        )
+
+        for i, (nama, nilai) in enumerate(data):
+
+            if total > 0:
+                persen = round(
+                    (nilai / total) * 100,
+                    1
+                )
+            else:
+                persen = 0
+
+            apps_list.append(
+                (
+                    str(i + 1),
+                    nama,
+                    f"{persen}%"
+                )
+            )
+
     for index, page in enumerate(reader.pages):
-
-        # =========================
-        # HALAMAN TERAKHIR
-        # PURE GAMBAR
-        # JANGAN TAMBAHKAN APA-APA
-        # =========================
-
-        if index == total_pages - 1:
-
-            writer.add_page(page)
-
-            continue
-
-        # =========================
-        # HALAMAN PDF ASLI
-        # TAMBAHKAN FOOTER
-        # =========================
 
         packet = BytesIO()
 
@@ -133,7 +144,66 @@ def add_page_number(
         )
 
         # =========================
-        # FOOTER
+        # DAFTAR 5 KIRI 5 KANAN
+        # HALAMAN TERAKHIR
+        # =========================
+
+        if index == total_pages - 1 and apps_list:
+
+            c.setFillColorRGB(
+                0,
+                0,
+                0
+            )
+
+            left_apps = apps_list[:5]
+            right_apps = apps_list[5:]
+
+            start_y = 210
+            line_height = 28
+
+            left_x = 70
+            right_x = width / 2 + 40
+
+            c.setFont(
+                "Helvetica",
+                13
+            )
+
+            for i, app in enumerate(left_apps):
+
+                y = start_y - (i * line_height)
+
+                c.drawString(
+                    left_x,
+                    y,
+                    f"{app[0]}. {app[1]}"
+                )
+
+                c.drawRightString(
+                    width / 2 - 20,
+                    y,
+                    app[2]
+                )
+
+            for i, app in enumerate(right_apps):
+
+                y = start_y - (i * line_height)
+
+                c.drawString(
+                    right_x,
+                    y,
+                    f"{app[0]}. {app[1]}"
+                )
+
+                c.drawRightString(
+                    width - 55,
+                    y,
+                    app[2]
+                )
+
+        # =========================
+        # FOOTER HITAM FULL LEBAR
         # =========================
 
         c.setFillColorRGB(
@@ -152,7 +222,7 @@ def add_page_number(
         )
 
         # =========================
-        # NOMOR HALAMAN
+        # NOMOR HALAMAN PUTIH
         # =========================
 
         c.setFillColorRGB(
@@ -182,11 +252,9 @@ def add_page_number(
             overlay
         )
 
-        writer.add_page(page)
-
-    # =========================
-    # SIMPAN PDF FINAL
-    # =========================
+        writer.add_page(
+            page
+        )
 
     with open(
         output_pdf,
