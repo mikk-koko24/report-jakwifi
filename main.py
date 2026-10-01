@@ -196,7 +196,8 @@ async def analyze(file: UploadFile = File(...)):
     create_pdf_report(
         pdf_path,
         image_output,
-        pdf_output
+        pdf_output,
+        data
     )
 
     html = (
